@@ -1,0 +1,71 @@
+---
+version: '3'
+
+silent: true
+
+tasks:
+
+
+  install-argo-app:
+    desc: Installs nginx resources manually on the local cluster
+    dir: config/apps/
+    cmds:
+    - kubectl apply -f dagster.yaml
+
+  rm:
+    dir: config/apps/
+    cmds:
+    - kubectl delete -n argocd -f dagster.yaml
+
+
+  run-dev-ex:
+    desc: Run dev example
+    cmds:
+    - task: create-project
+    - task: create-docker-file
+    - task: build-docker-image
+    - task: docker-push
+
+  create-project:
+    desc: Create namespace for dagster
+    cmds:
+    - |
+      python -m venv venv
+      source venv/bin/activate
+      pip list | grep dagster || pip install dagster 
+      pip list | grep dagster-webserver || pip install dagster-webserver
+      dagster project from-example --example deploy_k8s --name deploy_k8s
+      cp -r deploy_k8s/. .
+      rm -rf deploy_k8s
+
+  build-docker-image:
+    desc: Build docker image
+    cmds:
+    - docker build -t dagster-image .
+  
+  ghcr-login:
+    silent: true
+    desc: Login to ghcr
+    cmds:
+    - echo "you need to docker login" 
+    - echo " e.g \"echo \$GITHUB_TOKEN | docker login ghcr.io -u {{.GITHUB_USER}} --password-stdin\""
+
+  docker-push:
+    desc: Push docker image to ghcr
+    cmds:
+    - docker tag dagster-image ghcr.io/hagzag/dagster-workspace:latest
+    - docker push ghcr.io/hagzag/dagster-workspace:latest
+
+  # bypass github actions
+
+  build-docker-image-dev:
+    desc: Build docker image
+    cmds:
+    - docker build -t dagster-image:dev .
+
+  docker-push-dev:
+    desc: Push docker image to ghcr
+    dir: config/apps/dagster-workspace
+    cmds:
+    - docker tag dagster-image:dev ghcr.io/hagzag/dagster-workspace:dev
+    - docker push ghcr.io/hagzag/dagster-workspace:dev
